@@ -1,0 +1,19 @@
+guit2 - linux fender lt mustang thing
+----------------------
+
+guit2 is an app that communicates with the Fender Mustang LT 25 Amplifier.
+proto types are made by prost by the Tokio Project. (https://github.com/tokio-rs/prost)
+
+Protobuf files do not belong to me, and are from Brent Maxwell's LtAmp C# project. (https://github.com/brentmaxwell/LtAmp)
+
+hid.md is a doc made by me, facilitated with ai for understanding.
+
+hid.md - specifically HID interaction between host + USB type HIDs.
+Sources:
+https://cdn.kernel.org/doc/html/latest/hid/hidintro.html - Linux Kernel Docs | Introduction to HID report descriptors
+
+
+
+ltamp-docs contain docs written by Brent Maxwell (https://github.com/brentmaxwell/LtAmp/tree/main/Docs)
+
+

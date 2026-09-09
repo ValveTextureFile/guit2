@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let hid_report = FenderReport {
         tag: report::HID_END_MP,
-        len: payload.len().into(),
+        len: payload.len().into(), // ik ik im very tired and i want to go to bed
         payload: payload[1..payload.len()].to_vec(),
     };
 

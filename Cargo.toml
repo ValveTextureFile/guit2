@@ -1,0 +1,13 @@
+[package]
+name = "guit2"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hex = "0.4.3"
+hidapi = "2.6.7"
+prost = "0.14.4"
+prost-types = "0.14.4"
+
+[build-dependencies]
+prost-build = "0.14.4"

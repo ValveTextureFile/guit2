@@ -24,11 +24,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let hid_report = FenderReport {
         tag: report::HID_END_MP,
-        len: payload.len().into(), // ik ik im very tired and i want to go to bed
-        payload: payload[1..payload.len()].to_vec(),
+        len: payload.len() as u8, // ik ik im very tired and i want to go to bed
+        payload: payload.clone(),
     };
 
-    println!("{:?} via :?", hid_report);
+    println!("{}", hid_report);
+    println!("full: {:?}", hid_report.to_data()?);
 
+    assert_eq!(hid_report.to_data()?.len(), 64, "check for hid_datalen = 64");
+    assert_eq!(payload.len(), 9, "check for payloadlen = 9");
     Ok(())
 }

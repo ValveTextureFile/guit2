@@ -1,6 +1,6 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, process::Output};
 
-use hidapi::{DeviceInfo, HidApi, HidDevice};
+use hidapi::{DeviceInfo, HidApi, HidDevice, HidError};
 
 use crate::report::FenderData;
 
@@ -12,9 +12,15 @@ pub fn new_api_instance() -> Result<HidApi, Box<dyn Error>> {
     let api = HidApi::new()?;
     Ok(api)
 }
-
 pub struct FenderDevice {
     device: HidDevice,
+    pub vendor: u16,
+    pub product: u16,
+}
+
+pub enum HIDSendType {
+    Output,
+    Feature,
 }
 
 struct OpenStatus {
@@ -27,7 +33,7 @@ impl Display for OpenStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Opening Status ::\nVID: {}\nPID: {}\nInterface: {}",
+            "Opening Status :: VID: {}  PID: {}  Interface: {}",
             self.vid_true, self.pid_true, self.interface_true
         )
     }
@@ -47,30 +53,17 @@ impl FenderDevice {
     /// UNTESTED
 
     pub fn open(api: &HidApi) -> Result<Self, Box<dyn Error>> {
-        let mut status: OpenStatus = OpenStatus::new();
-
         for d in api.device_list() {
-            // check vendor
-            if !d.vendor_id().eq(&FENDER_VID) {
-                status.vid_true = false;
-            }
+            let matches = d.vendor_id() == FENDER_VID
+                && d.product_id() == LT25_PID
+                && d.interface_number() == LT25_INTR;
 
-            // check product
-            if !d.product_id().eq(&LT25_PID) {
-                status.pid_true = false;
-            }
-
-            // check interface todo fix
-            if !d.interface_number().eq(&LT25_INTR) {
-                status.interface_true = false;
-            }
-
-            if !status.interface_true || !status.pid_true || !status.vid_true {
-                return Err(format!("couldn't open/find fender device: {}", status).into());
+            if !matches {
+                continue;
             }
 
             println!(
-                "found match: {}:{} @ interface {}",
+                "found match: {:04x}:{:04x} @ interface {}",
                 d.vendor_id(),
                 d.product_id(),
                 d.interface_number()
@@ -78,17 +71,33 @@ impl FenderDevice {
 
             return Ok(Self {
                 device: d.open_device(api)?,
+                vendor: d.vendor_id(),
+                product: d.product_id(),
             });
         }
 
-        Err("something else happended here...".into())
+        Err("Fender Mustang LT25 was not found".into())
     }
 
-    pub fn send(message: FenderData) -> Result<(), Box<dyn Error>> {
-        todo!()
+    pub fn send(&self, message: &FenderData, typ: HIDSendType) -> Result<(), Box<dyn Error>> {
+        let mut _result;
+        match typ {
+            HIDSendType::Output => {
+                _result = self.device.send_output_report(message)?;
+            }
+            HIDSendType::Feature => {
+                _result = self.device.send_feature_report(message)?;
+            }
+        }
+
+        Ok(_result)
     }
 
-    pub fn receive() -> Result<FenderData, Box<dyn Error>> {
-        todo!()
+    /// returns data and bytes read
+    pub fn receive(&self) -> Result<(FenderData, usize), Box<dyn Error>> {
+        let mut recieved: FenderData = [0u8; 64];
+        let recieved_bytes = self.device.read(&mut recieved)?;
+
+        Ok((recieved.to_owned(), recieved_bytes))
     }
 }

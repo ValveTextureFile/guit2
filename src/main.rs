@@ -1,12 +1,12 @@
 use prost::Message;
 
-use crate::{compiledprotos::{
+use crate::{fenderprotos::{
     FenderMessageLt, ModalContext, ModalState, ModalStatusMessage, ResponseType, fender_message_lt,
 }, report::FenderReport};
 
 mod report;
 mod device;
-mod compiledprotos;
+mod fenderprotos;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // goal 2: turn message into hid
@@ -24,7 +24,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let hid_report = FenderReport {
         tag: report::HID_END_MP,
-        len: payload.len() as u8, // ik ik im very tired and i want to go to bed
         payload: payload.clone(),
     };
 

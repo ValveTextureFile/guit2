@@ -1,3 +1,6 @@
+use core::sync;
+
+use hidapi::HidApi;
 use prost::Message;
 
 use crate::{fenderprotos::{
@@ -6,31 +9,23 @@ use crate::{fenderprotos::{
 
 mod report;
 mod device;
+mod protocol;
 mod fenderprotos;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // goal 2: turn message into hid
-    let msg = FenderMessageLt {
-        response_type: ResponseType::Unsolicited.into(),
-        r#type: Some(fender_message_lt::Type::ModalStatusMessage(
-            ModalStatusMessage {
-                context: ModalContext::SyncBegin.into(),
-                state: ModalState::Ok.into(),
-            },
-        )),
-    };
+    
+    let api = device::new_api_instance()?;
 
-    let payload = msg.encode_to_vec();
+    let sync_begin = protocol::messages::sync_begin();
+    let sync_begin_report = report::FenderReport::from_data(protocol::encode(&sync_begin)?)?;
 
-    let hid_report = FenderReport {
-        tag: report::HID_END_MP,
-        payload: payload.clone(),
-    };
+    let lt25 = device::FenderDevice::open(&api)?;
 
-    println!("{}", hid_report);
-    println!("full: {:?}", hid_report.to_data()?);
+    let status = fende
 
-    assert_eq!(hid_report.to_data()?.len(), 64, "check for hid_datalen = 64");
-    assert_eq!(payload.len(), 9, "check for payloadlen = 9");
+
+
+
+
     Ok(())
 }

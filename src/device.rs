@@ -1,8 +1,8 @@
-use std::{error::Error, fmt::Display, process::Output};
+use std::{error::Error, fmt::Display, usize};
 
-use hidapi::{DeviceInfo, HidApi, HidDevice, HidError};
+use hidapi::{HidApi, HidDevice};
 
-use crate::report::FenderData;
+use crate::report::{FenderData, FenderReport};
 
 pub const FENDER_VID: u16 = 0x1ed8;
 pub const LT25_PID: u16 = 0x0037;
@@ -79,25 +79,51 @@ impl FenderDevice {
         Err("Fender Mustang LT25 was not found".into())
     }
 
+    /// lower send function, not recommended to use
     pub fn send(&self, message: &FenderData, typ: HIDSendType) -> Result<(), Box<dyn Error>> {
         let mut _result;
         match typ {
             HIDSendType::Output => {
-                _result = self.device.send_output_report(message)?;
+                _result = self.device.send_output_report(message);
             }
             HIDSendType::Feature => {
-                _result = self.device.send_feature_report(message)?;
+                _result = self.device.send_feature_report(message);
             }
         }
 
-        Ok(_result)
+        Ok(_result?)
     }
 
-    /// returns data and bytes read
+    /// returns data and bytes read | lower function, not recommended to use
     pub fn receive(&self) -> Result<(FenderData, usize), Box<dyn Error>> {
         let mut recieved: FenderData = [0u8; 64];
         let recieved_bytes = self.device.read(&mut recieved)?;
 
         Ok((recieved.to_owned(), recieved_bytes))
+    }
+
+    /// takes more higher level FenderReport. (reduce boilerplate)
+    pub fn higher_send(&self, report: &FenderReport, typ: HIDSendType) -> Result<(), Box<dyn Error>> {
+        let result;
+        let payload: FenderData = report.to_data()?;
+    
+        result = self.send(&payload, typ);
+        result
+    }
+    
+
+    /// returns more higher Fender Report.
+    pub fn higher_receive(&self) -> Result<FenderReport, Box<dyn Error>> {
+        let data = match self.receive() {
+            Ok((fdata, _bytes)) => {
+                fdata
+            }
+
+            Err(e) => {
+                return Err(e);
+            }
+        };
+
+        FenderReport::from_data(data)
     }
 }

@@ -1,13 +1,12 @@
-use core::sync;
 use std::error::Error;
 
 use hidapi::HidApi;
 use prost::Message;
 
 use crate::{
-    device::FenderDevice, fenderprotos::{
-        FenderMessageLt, FirmwareVersionRequest, ModalContext, ModalState, ModalStatusMessage, ResponseType, fender_message_lt,
-    }, protocol::LTMessage, report::{FenderReport, HID_END_MP},
+    device::FenderDevice,
+    protocol::LTMessage,
+    report::{FenderReport, HID_END_MP},
 };
 
 mod device;
@@ -15,7 +14,7 @@ mod fenderprotos;
 mod protocol;
 mod report;
 
-fn sync_begin_req(api: &HidApi) -> Result<(), Box<dyn Error>> {   
+fn sync_begin_req(api: &HidApi) -> Result<(), Box<dyn Error>> {
     let device = FenderDevice::open(&api)?;
 
     let message = LTMessage::sync_begin();
@@ -26,7 +25,10 @@ fn sync_begin_req(api: &HidApi) -> Result<(), Box<dyn Error>> {
 
     let data = report.to_data()?;
 
-    println!("sending outpute message to {}:{}", device.vendor, device.product);
+    println!(
+        "sending outpute message to {}:{}",
+        device.vendor, device.product
+    );
     device.send(&data, device::HIDSendType::Output)?;
 
     let (respone_data, respone_bytes) = device.receive()?;
@@ -43,38 +45,16 @@ fn sync_begin_req(api: &HidApi) -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let api = device::new_api_instance()?;
+    let device = FenderDevice::open(&device::new_api_instance()?)?;
 
-    sync_begin_req(&api)?;
+    device.higher_send(
+        &FenderReport::new(HID_END_MP, protocol::LTMessage::sync_begin().encode())?,
+        device::HIDSendType::Output,
+    )?;
 
-    let device = FenderDevice::open(&api)?;
-
-    // send firmware request
-
-    let fw_msg = LTMessage::firmware_version_request(FirmwareVersionRequest {
-        request: true
-    });
-
-    let fw_payload = fw_msg.encode();
-
-    let fw_report = FenderReport::new(HID_END_MP, fw_payload)?;
-
-    let fw_data = fw_report.to_data()?;
-
-    println!("sending outpute message to {:04x}:{:04x}", device.vendor, device.product);
-    device.send(&fw_data, device::HIDSendType::Output)?;
-
-    let (d, b) = device.receive()?;
-    println!("from {:04x}:{:04x}", device.vendor, device.product);
-    println!("data: {:?}", d);
-    println!("bytes read: {}", b);
-    let report = FenderReport::from_data(d)?;
-
-    let response = protocol::decode(&report.payload)?;
-
-    println!("{response:#?}");
-
-
+    let return_report = device.higher_receive()?;
+    let repsonse = protocol::decode(&return_report.payload)?;
+    println!("{repsonse:#?}");
 
 
     Ok(())

@@ -1,17 +1,11 @@
-use std::{
-    error::Error,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 use prost::Message;
 
-use crate::{
-    fenderprotos::{
+use crate::fenderprotos::{
         self, FenderMessageLt, ModalContext, ModalState, ModalStatusMessage, ResponseType,
         fender_message_lt,
-    },
-    report::FenderData,
-};
+    };
 
 /// Ergonomic wrapper around every payload supported by `FenderMessageLt`.
 #[derive(Clone, PartialEq)]
@@ -165,7 +159,6 @@ impl From<FenderMessageLt> for LTMessage {
 pub fn decode(payload: &[u8]) -> Result<FenderMessageLt, prost::DecodeError> {
     FenderMessageLt::decode(payload)
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

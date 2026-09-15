@@ -11,7 +11,8 @@
 //! [`FenderReport::to_data`] begin directly with the protocol fields
 //! (`[tag, length, payload, ...]`).
 
-use std::{error::Error, fmt::Display, io::Write};
+use super::DynamicError;
+use std::{fmt::Display, io::Write};
 
 /// Fender HID protocol for starting a multi-packet report.
 pub const HID_START_MP: u8 = 0x33;
@@ -54,7 +55,7 @@ impl FenderReport {
     /// # Errors
     ///
     /// Returns an error if `payload` contains more than 61 bytes.
-    pub fn new(tag: u8, payload: Vec<u8>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(tag: u8, payload: Vec<u8>) -> Result<Self, DynamicError> {
         if payload.len() > 61 {
             return Err("payload made exceeds max payload size of 61 bytes.".into());
         }
@@ -71,7 +72,7 @@ impl FenderReport {
     ///
     /// Returns an error if the report-ID prefix is not zero or if the encoded
     /// payload length is greater than 61 bytes.
-    pub fn from_data(data: FenderData) -> Result<Self, Box<dyn Error>> {
+    pub fn from_data(data: FenderData) -> Result<Self, DynamicError> {
         if data[0] != 0 {
             return Err("invalid Fender input report prefix".into());
         }
@@ -108,7 +109,7 @@ impl FenderReport {
     /// Returns an I/O error if the payload does not fit in the 64-byte buffer.
     /// Construct reports with [`Self::new`] to enforce the 61-byte protocol
     /// payload limit before encoding.
-    pub fn to_data(&self) -> Result<FenderData, Box<dyn std::error::Error>> {
+    pub fn to_data(&self) -> Result<FenderData, DynamicError> {
         // 0 data + make writer
         let mut data: FenderData = [0u8; 64];
         let mut writer = &mut data[..];

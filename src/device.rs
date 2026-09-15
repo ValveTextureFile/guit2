@@ -1,14 +1,16 @@
-use std::{error::Error, fmt::Display, usize};
+use std::{fmt::Display, sync::mpsc::Sender, usize};
 
 use hidapi::{HidApi, HidDevice};
 
-use crate::report::{FenderData, FenderReport};
+use crate::{fenderprotos::FenderMessageLt, protocol::LTMessage, report::{FenderData, FenderReport}};
+
+use super::DynamicError;
 
 pub const FENDER_VID: u16 = 0x1ed8;
 pub const LT25_PID: u16 = 0x0037;
 pub const LT25_INTR: i32 = 0;
 
-pub fn new_api_instance() -> Result<HidApi, Box<dyn Error>> {
+pub fn new_api_instance() -> Result<HidApi, DynamicError> {
     let api = HidApi::new()?;
     Ok(api)
 }
@@ -17,6 +19,8 @@ pub struct FenderDevice {
     pub vendor: u16,
     pub product: u16,
 }
+
+
 
 pub enum HIDSendType {
     Output,
@@ -52,7 +56,7 @@ impl OpenStatus {
 impl FenderDevice {
     /// UNTESTED
 
-    pub fn open(api: &HidApi) -> Result<Self, Box<dyn Error>> {
+    pub fn open(api: &HidApi) -> Result<Self, DynamicError> {
         for d in api.device_list() {
             let matches = d.vendor_id() == FENDER_VID
                 && d.product_id() == LT25_PID
@@ -80,7 +84,7 @@ impl FenderDevice {
     }
 
     /// lower send function, not recommended to use
-    pub fn send(&self, message: &FenderData, typ: HIDSendType) -> Result<(), Box<dyn Error>> {
+    pub fn send(&self, message: &FenderData, typ: HIDSendType) -> Result<(), DynamicError> {
         let mut _result;
         match typ {
             HIDSendType::Output => {
@@ -95,7 +99,7 @@ impl FenderDevice {
     }
 
     /// returns data and bytes read | lower function, not recommended to use
-    pub fn receive(&self) -> Result<(FenderData, usize), Box<dyn Error>> {
+    pub fn receive(&self) -> Result<(FenderData, usize), DynamicError> {
         let mut recieved: FenderData = [0u8; 64];
         let recieved_bytes = self.device.read(&mut recieved)?;
 
@@ -103,17 +107,17 @@ impl FenderDevice {
     }
 
     /// takes more higher level FenderReport. (reduce boilerplate)
-    pub fn higher_send(&self, report: &FenderReport, typ: HIDSendType) -> Result<(), Box<dyn Error>> {
-        let result;
+    pub fn higher_send(&self, report: &FenderReport, typ: HIDSendType) -> Result<(), DynamicError> {
         let payload: FenderData = report.to_data()?;
     
-        result = self.send(&payload, typ);
-        result
+        println!("{:?}", payload);
+
+        self.send(&payload, typ)
     }
     
 
     /// returns more higher Fender Report.
-    pub fn higher_receive(&self) -> Result<FenderReport, Box<dyn Error>> {
+    pub fn higher_receive(&self) -> Result<FenderReport, DynamicError> {
         let data = match self.receive() {
             Ok((fdata, _bytes)) => {
                 fdata

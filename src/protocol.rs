@@ -3,12 +3,12 @@ use std::ops::{Deref, DerefMut};
 use prost::Message;
 
 use crate::fenderprotos::{
-        self, FenderMessageLt, ModalContext, ModalState, ModalStatusMessage, ResponseType,
-        fender_message_lt,
-    };
+    self, FenderMessageLt, Heartbeat, ModalContext, ModalState, ModalStatusMessage, ResponseType,
+    fender_message_lt,
+};
 
 /// Ergonomic wrapper around every payload supported by `FenderMessageLt`.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct LTMessage {
     pub msg: FenderMessageLt,
 }
@@ -118,7 +118,7 @@ impl LTMessage {
     pub fn heartbeat() -> Self {
         Self::new(
             ResponseType::Unsolicited,
-            fender_message_lt::Type::Heartbeat(fenderprotos::Heartbeat::default()),
+            fender_message_lt::Type::Heartbeat(Heartbeat { dummy_field: true }),
         )
     }
 

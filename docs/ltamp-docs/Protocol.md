@@ -63,6 +63,7 @@ It's also necessary to send a [`heartbeat`](/Docs/protobuf.md#heartbeat) message
 ```
 >>> { "responseType": "UNSOLICITED", "heartbeat": { "dummyField": true } }
 ```
+ | VTF's Edit: Fender doesnt return anything for the heartbeat, and dummyField doesnt have to be true
 
 ## Preset format
 The presets are sent and received as JSON ([schema](/Docs/json.md)).

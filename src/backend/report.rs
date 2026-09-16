@@ -15,10 +15,18 @@ use super::DynamicError;
 use std::{fmt::Display, io::Write};
 
 /// Fender HID protocol for starting a multi-packet report.
+/// 
+/// Mostly unused until i find something.
+#[allow(unused)]
 pub const HID_START_MP: u8 = 0x33;
 /// Fender HID protocol for continuing a multi-packet report.
+/// 
+/// Mostly unused until i find something.
+#[allow(unused)]
 pub const HID_CONT_MP: u8 = 0x34;
 /// Fender HID protocol for ending a multi-packet report or making a single packet report.
+/// 
+/// __Mostly used.__
 pub const HID_END_MP: u8 = 0x35;
 
 #[derive(Debug, PartialEq, Eq)]

@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use prost::Message;
 
-use crate::fenderprotos::{
+use super::fenderprotos::{
     self, FenderMessageLt, Heartbeat, ModalContext, ModalState, ModalStatusMessage, ResponseType,
     fender_message_lt,
 };

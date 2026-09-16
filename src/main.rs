@@ -1,43 +1,37 @@
 use std::error::Error;
 
-use crate::{
-    client::FenderClient, device::FenderDevice, protocol::LTMessage,
-};
+use crate::backend::{client::FenderClient, device::{self, FenderDevice}};
 
 pub type DynamicError = Box<dyn Error>;
 
-mod client;
-mod device;
-mod fenderprotos;
-mod protocol;
-mod report;
+mod backend;
 
 fn main() -> Result<(), DynamicError> {
-    // let mut client = FenderClient::new(FenderDevice::open(&device::new_api_instance()?)?);
-    //! implement threading
-    // this is currently under construction due to threading implemenetation
+    let client = FenderClient::new(
+        FenderDevice::open(
+            &device::new_api_instance()?
+        )?
+    );
 
-    // start sync
     client.sync_begin()?;
-    println!("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~>");
+    client.get_firmware()?;
     client.sync_end()?;
-    println!("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~>");
-    // client.hearbeat()?;    
     client.hearbeat()?;
-
     
 
     Ok(())
 }
 
+
+// todo :: make genuine tests
 #[cfg(test)]
 mod tests {
-    use crate::{client::FenderClient, device::{self, FenderDevice}};
+    use crate::{backend::client::FenderClient, device::{self, FenderDevice}};
 
     #[test]
     #[ignore]
     fn lt25_sync_round_trip() {
-        let mut client = FenderClient::new(FenderDevice::open(&device::new_api_instance().expect("new api")).expect("opening of device"));
+        let client = FenderClient::new(FenderDevice::open(&device::new_api_instance().expect("new api")).expect("opening of device"));
 
         client.sync_begin().expect("sent sync_begin");
 

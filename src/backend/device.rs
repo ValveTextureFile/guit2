@@ -1,8 +1,10 @@
-use std::{fmt::Display, sync::mpsc::Sender, usize};
+use std::{fmt::Display, usize};
 
 use hidapi::{HidApi, HidDevice};
 
-use crate::{fenderprotos::FenderMessageLt, protocol::LTMessage, report::{FenderData, FenderReport}};
+use super::{
+    report::{FenderData, FenderReport},
+};
 
 use super::DynamicError;
 
@@ -16,14 +18,19 @@ pub fn new_api_instance() -> Result<HidApi, DynamicError> {
 }
 pub struct FenderDevice {
     device: HidDevice,
+    #[allow(dead_code)]
     pub vendor: u16,
+    #[allow(dead_code)]
     pub product: u16,
 }
 
-
-
 pub enum HIDSendType {
     Output,
+    /// # WARNING
+    /// __DEAD CODE!!!__
+    /// 
+    /// I literally have never seen this used in the wild. but it's there just in case. - vtf
+    #[allow(dead_code)]
     Feature,
 }
 
@@ -109,19 +116,16 @@ impl FenderDevice {
     /// takes more higher level FenderReport. (reduce boilerplate)
     pub fn higher_send(&self, report: &FenderReport, typ: HIDSendType) -> Result<(), DynamicError> {
         let payload: FenderData = report.to_data()?;
-    
+
         println!("{:?}", payload);
 
         self.send(&payload, typ)
     }
-    
 
     /// returns more higher Fender Report.
     pub fn higher_receive(&self) -> Result<FenderReport, DynamicError> {
         let data = match self.receive() {
-            Ok((fdata, _bytes)) => {
-                fdata
-            }
+            Ok((fdata, _bytes)) => fdata,
 
             Err(e) => {
                 return Err(e);

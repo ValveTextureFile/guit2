@@ -1,24 +1,34 @@
+use std::ptr::read;
+
+use crate::{DynamicError, amp::values::Preset, backend::client::FenderClient};
+
 pub mod values;
-
-use values::{FenderSettings, FenderModSettings};
-
-use crate::{DynamicError, backend::client::FenderClient};
-
-pub struct FenderPreset {
-    is_current: bool,
-    pub name: String,
-    pub settings: FenderSettings,
-}
+pub mod dsp;
 
 pub struct FenderAmp {
-    profiles: Vec<FenderPreset>,
-    pub current_profile: FenderPreset,
-    pub current_settings: FenderSettings,
+    client: FenderClient,
+    pub firmware: Option<String>,
+    pub current_preset: Option<Preset>,
+    presets: Vec<Preset>
 }
 
 impl FenderAmp {
-    pub fn get_current(client: &FenderClient) -> Result<Self, DynamicError> {
+    pub fn connect(client: FenderClient) -> Result<Self, DynamicError> {
+        let result = client.sync()?;
         
+        let firmware = Some(result.firmware);
+        let presets = result.presets;
+
+        let current_preset = Some(client.get_preset(client.get_current_preset()?.current_slot_index)?);
+
+        Ok(Self {
+            firmware,
+            presets, current_preset,
+            client
+        })        
+    }
+
+    pub fn load_preset(&self, preset: Preset) {
         todo!()
     }
 }

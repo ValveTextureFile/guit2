@@ -1,19 +1,23 @@
 use std::{
     sync::mpsc::{self, Receiver, Sender},
     thread,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
+use serde::de::value::BorrowedStrDeserializer;
+
 use crate::{
-    amp::FenderPreset,
+    amp::values::Preset,
     backend::{
         device::{self, FenderDevice},
         fenderprotos::{
-            FenderMessageLt, FirmwareVersionRequest, LoadPreset, ModalContext, ModalState,
-            ResponseType, RetrievePreset, fender_message_lt::Type as fmltType,
+            ActiveDisplay, CurrentDisplayedPresetIndexStatus, CurrentPresetRequest,
+            CurrentPresetStatus, FenderMessageLt, FirmwareVersionRequest, LoadPreset, ModalContext,
+            ModalState, ResponseType, RetrievePreset, ShiftPreset,
+            fender_message_lt::Type as fmltType,
         },
         protocol::{self, LTMessage},
-        report::{FenderReport, HID_END_MP},
+        report::{FenderReport, HID_CONT_MP, HID_END_MP, HID_START_MP},
     },
 };
 
@@ -21,6 +25,11 @@ use crate::DynamicError;
 
 pub struct FenderClient {
     tx: Sender<DeviceCommand>,
+}
+
+pub struct SyncResult {
+    pub firmware: String,
+    pub presets: Vec<Preset>,
 }
 
 pub enum DeviceCommand {
@@ -37,6 +46,28 @@ pub enum DeviceCommand {
     Shutdown,
 }
 
+fn receive_message(device: &FenderDevice) -> Result<Vec<u8>, DynamicError> {
+    let mut payload = Vec::new();
+
+    loop {
+        let report = device.higher_receive()?;
+
+        payload.extend_from_slice(&report.payload);
+
+        match report.tag {
+            HID_END_MP => break,
+
+            HID_START_MP | HID_CONT_MP => continue,
+
+            tag => {
+                return Err(format!("unknown HID packet tag: {tag:#04x}").into());
+            }
+        }
+    }
+
+    Ok(payload)
+}
+
 pub fn preform_send(device: &FenderDevice, msg: LTMessage) -> Result<(), DynamicError> {
     let report = FenderReport::new(HID_END_MP, msg.encode())?;
 
@@ -49,18 +80,16 @@ pub fn preform_transact(
     device: &FenderDevice,
     msg: LTMessage,
 ) -> Result<FenderMessageLt, DynamicError> {
-    let report = FenderReport::new(HID_END_MP, msg.encode())?;
+    preform_send(device, msg)?;
 
-    device.higher_send(&report, device::HIDSendType::Output)?;
+    let pl = receive_message(device)?;
 
-    let response = protocol::decode(&device.higher_receive()?.payload)?;
-
-    Ok(response)
+    Ok(protocol::decode(&pl)?)
 }
 
 fn device_worker(device: FenderDevice, rx: Receiver<DeviceCommand>) {
+    let mut hb_time = Instant::now();
     loop {
-        let hb_time = SystemTime::now();
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(DeviceCommand::Transact { message, response }) => {
                 let result = preform_transact(&device, message).map_err(|error| error.to_string());
@@ -83,23 +112,17 @@ fn device_worker(device: FenderDevice, rx: Receiver<DeviceCommand>) {
 
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 // Nothing arrived. Check if it's time to send a heartbeat.
-                if SystemTime::now()
-                    .duration_since(hb_time)
-                    .expect("Unable to get duration since HB_Timer.start")
-                    >= Duration::from_secs(1)
-                {
-                    let _ = preform_send(
-                        &device,
-                        LTMessage {
-                            msg: LTMessage::heartbeat().into_inner(),
-                        },
-                    );
-                }
             }
 
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 break;
             }
+        }
+        if hb_time.elapsed() >= Duration::from_secs(1) {
+            if let Err(e) = preform_send(&device, LTMessage::heartbeat()) {
+                eprintln!("heartbeat failed: {e}");
+            }
+            hb_time = Instant::now();
         }
     }
 }
@@ -194,23 +217,75 @@ impl FenderClient {
         }
     }
 
+    pub fn sync(&self) -> Result<SyncResult, DynamicError> {
+        self.sync_begin()?;
+
+        let firmware = self.get_firmware()?;
+
+        let mut presets = Vec::new();
+
+        for index in 1..60 {
+            presets.push(self.get_preset(index)?);
+        }
+
+        self.sync_end()?;
+
+        Ok(SyncResult { firmware, presets })
+    }
+
     pub fn hearbeat(&self) -> Result<(), DynamicError> {
         self.send(LTMessage::heartbeat())
     }
 
-    pub fn get_preset(&self, id: u32) -> Result<FenderPreset, DynamicError> {
+    pub fn get_preset(&self, id: i32) -> Result<Preset, DynamicError> {
         // just transacts with the device and returns the preset data
-        let response = self.transact(LTMessage::retrieve_preset(RetrievePreset {
-            slot: id as i32,
-        }))?;
+        let response = self.transact(LTMessage::retrieve_preset(RetrievePreset { slot: id }))?;
 
         match response.r#type.as_ref() {
-            Some(fmltType::PresetJsonMessage(m)) => {
-                todo!()
+            Some(fmltType::PresetJsonMessage(m))
+                if response.response_type == ResponseType::IsLastAck as i32
+                    && !m.data.is_empty()
+                    && m.slot_index == id =>
+            {
+                let ds_json: Preset = serde_json::from_str(&m.data)?;
+                println!("got data! ~> {}", serde_json::to_string_pretty(&ds_json)?);
+                Ok(ds_json)
             }
-            _ => {
-                Err(format!("unexpected response to RetrivePreset:\n{response:#?}").into())
-            },
+
+            _ => Err(format!("unexpected response to RetrivePreset:\n{response:?}").into()),
+        }
+    }
+
+    pub fn get_current_preset(&self) -> Result<CurrentPresetStatus, DynamicError> {
+        let response = self.transact(LTMessage::current_preset_request(CurrentPresetRequest {
+            request: true,
+        }))?;
+
+        match response.r#type {
+            Some(fmltType::CurrentPresetStatus(s))
+                if response.response_type == ResponseType::IsLastAck as i32 =>
+            {
+                Ok(s)
+            }
+            _ => Err(format!("unexpected response to CurrentPresetRequest:\n{response:#?}").into()),
+        }
+    }
+
+    pub fn set_preset_by_index(&self, id: i32) -> Result<(), DynamicError> {
+        if id > 60 || id < 1 {
+           return Err("the id to switch to must be between the values of 1 and 60".into()) 
+        }
+
+        let response = self.transact(LTMessage::load_preset(LoadPreset { preset_index: id }))?;
+
+        match response.r#type {
+            Some(fmltType::CurrentLoadedPresetIndexStatus(s))
+                if response.response_type == ResponseType::IsLastAck as i32
+                && s.current_loaded_preset_index == id => {
+                    Ok(())
+                }
+
+            _ => Err(format!("unexpected response to LoadPreset:\n{response:#?}").into())
         }
     }
 }

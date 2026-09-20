@@ -16,6 +16,9 @@ fn main() -> Result<(), DynamicError> {
 
     client.sync_begin()?;
     client.get_firmware()?;
+    let preset = client.get_preset(01)?;
+    println!("{preset}");
+    client.set_preset_by_index(02)?;
     client.sync_end()?;
     client.hearbeat()?;
     

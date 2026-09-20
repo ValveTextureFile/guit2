@@ -5,6 +5,7 @@ use crate::backend::{client::FenderClient, device::{self, FenderDevice}};
 pub type DynamicError = Box<dyn Error>;
 
 mod backend;
+mod amp;
 
 fn main() -> Result<(), DynamicError> {
     let client = FenderClient::new(

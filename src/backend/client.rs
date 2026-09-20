@@ -5,13 +5,16 @@ use std::{
 };
 
 use crate::{
-    backend::device::{self, FenderDevice},
-    backend::fenderprotos::{
-        FenderMessageLt, FirmwareVersionRequest, ModalContext, ModalState, ResponseType,
-        fender_message_lt::Type as fmltType,
+    amp::FenderPreset,
+    backend::{
+        device::{self, FenderDevice},
+        fenderprotos::{
+            FenderMessageLt, FirmwareVersionRequest, LoadPreset, ModalContext, ModalState,
+            ResponseType, RetrievePreset, fender_message_lt::Type as fmltType,
+        },
+        protocol::{self, LTMessage},
+        report::{FenderReport, HID_END_MP},
     },
-    backend::protocol::{self, LTMessage},
-    backend::report::{FenderReport, HID_END_MP},
 };
 
 use crate::DynamicError;
@@ -193,6 +196,22 @@ impl FenderClient {
 
     pub fn hearbeat(&self) -> Result<(), DynamicError> {
         self.send(LTMessage::heartbeat())
+    }
+
+    pub fn get_preset(&self, id: u32) -> Result<FenderPreset, DynamicError> {
+        // just transacts with the device and returns the preset data
+        let response = self.transact(LTMessage::retrieve_preset(RetrievePreset {
+            slot: id as i32,
+        }))?;
+
+        match response.r#type.as_ref() {
+            Some(fmltType::PresetJsonMessage(m)) => {
+                todo!()
+            }
+            _ => {
+                Err(format!("unexpected response to RetrivePreset:\n{response:#?}").into())
+            },
+        }
     }
 }
 

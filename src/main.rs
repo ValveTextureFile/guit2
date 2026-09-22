@@ -6,6 +6,7 @@ pub type DynamicError = Box<dyn Error>;
 
 mod backend;
 mod amp;
+mod cli;
 
 fn main() -> Result<(), DynamicError> {
     let client = FenderClient::new(
@@ -18,10 +19,10 @@ fn main() -> Result<(), DynamicError> {
     client.get_firmware()?;
     let preset = client.get_preset(01)?;
     println!("{preset}");
-    client.set_preset_by_index(02)?;
     client.sync_end()?;
     client.hearbeat()?;
     
+    client.set_preset_by_index(02)?;
 
     Ok(())
 }

@@ -285,6 +285,14 @@ impl FenderClient {
                     Ok(())
                 }
 
+            Some(fmltType::PresetEditedStatus(s))
+                if response.response_type == ResponseType::NotLastAck as i32
+                && s.preset_edited == false => {
+                    println!("warning: you had unsaved changes to your preset. they're gone now. might add a safeguard for this.");
+                    //? add a safe guard here?
+                    Ok(())
+                }
+
             _ => Err(format!("unexpected response to LoadPreset:\n{response:#?}").into())
         }
     }

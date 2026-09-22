@@ -117,7 +117,7 @@ impl FenderDevice {
     pub fn higher_send(&self, report: &FenderReport, typ: HIDSendType) -> Result<(), DynamicError> {
         let payload: FenderData = report.to_data()?;
 
-        println!("{:?}", payload);
+        // println!("{:?}", payload);
 
         self.send(&payload, typ)
     }

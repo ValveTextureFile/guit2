@@ -2,6 +2,8 @@ use std::{collections::HashMap, fmt::{Display, Write}};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::DynamicError;
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Preset {
     #[serde(rename = "audioGraph")]
@@ -54,6 +56,12 @@ impl Display for Preset {
         }
 
         Ok(())
+    }
+}
+
+impl Preset {
+    pub fn from_data<S: AsRef<str>>(data: S) -> Result<Self, DynamicError> {
+        Ok(serde_json::from_str(data.as_ref())?)
     }
 }
 

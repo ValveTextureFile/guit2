@@ -15,7 +15,7 @@ pub struct FenderAmp {
 impl FenderAmp {
     pub fn connect(client: FenderClient) -> Result<Self, DynamicError> {
         let result = client.sync()?;
-        
+
         let firmware = Some(result.firmware);
         let presets = result.presets;
 

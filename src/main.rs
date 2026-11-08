@@ -1,3 +1,5 @@
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     error::Error,

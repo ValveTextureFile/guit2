@@ -92,13 +92,16 @@ impl FenderDevice {
 
     /// lower send function, not recommended to use
     pub fn send(&self, message: &FenderData, typ: HIDSendType) -> Result<(), DynamicError> {
+        // hidapi reads byte 0 as the report id; the LT25 has none, so it must be 0 (windows rejects anything else)
+        let mut buf = [0u8; 65];
+        buf[1..].copy_from_slice(message);
         let mut _result;
         match typ {
             HIDSendType::Output => {
-                _result = self.device.send_output_report(message);
+                _result = self.device.send_output_report(&buf);
             }
             HIDSendType::Feature => {
-                _result = self.device.send_feature_report(message);
+                _result = self.device.send_feature_report(&buf);
             }
         }
 

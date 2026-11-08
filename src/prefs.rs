@@ -23,7 +23,7 @@ pub struct Prefs {
 
 impl Default for Prefs {
     fn default() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let home = std::env::home_dir().map(|h| h.display().to_string()).unwrap_or_else(|| ".".into());
         Self {
             theme: ThemePreference::Dark,
             accent: ACCENTS[0].1,

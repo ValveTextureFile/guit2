@@ -1,0 +1,58 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # older ubuntu = older glibc, so the binary runs on more distros
+          - { os: ubuntu-22.04, name: linux-x86_64, bin: guit2, extra: 99-guit2.rules }
+          - { os: windows-latest, name: windows-x86_64, bin: guit2.exe, extra: "" }
+          - { os: macos-latest, name: macos-arm64, bin: guit2, extra: "" }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: linux deps
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev libxkbcommon-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: cargo test --locked
+      - run: cargo build --release --locked
+
+      - name: package
+        run: |
+          dir=guit2-${GITHUB_REF_NAME}-${{ matrix.name }}
+          mkdir $dir
+          cp target/release/${{ matrix.bin }} readme LICENSE assets/LUCIDE-LICENSE ${{ matrix.extra }} $dir/
+          if [ "$RUNNER_OS" = Windows ]; then 7z a $dir.zip $dir; else tar czf $dir.tar.gz $dir; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: guit2-*.*z*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - run: sha256sum guit2-* > SHA256SUMS
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" guit2-* SHA256SUMS --repo "$GITHUB_REPOSITORY" --title "guit2 $GITHUB_REF_NAME" --generate-notes

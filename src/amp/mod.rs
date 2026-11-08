@@ -83,7 +83,7 @@ impl FenderAmp {
         let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
         let lock = single_instance_lock(&runtime)?;
         let device = FenderDevice::open(&device::new_api_instance()?).map_err(|e| {
-            format!("{e} (plugged in? without root you need the udev rule from the readme)")
+            format!("{e} (plugged in? on linux without root you need the udev rule from the readme)")
         })?;
         let (client, events) = FenderClient::new(device);
         let result = client.sync()?;

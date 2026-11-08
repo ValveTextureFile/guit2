@@ -1,9 +1,12 @@
 use std::{
+    collections::VecDeque,
+    fs::{File, TryLockError},
+    path::{Path, PathBuf},
     sync::{
         Arc, Mutex, MutexGuard,
         mpsc::{Receiver, RecvTimeoutError, TryRecvError},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use serde_json::Value;
@@ -32,7 +35,13 @@ pub struct AmpState {
     pub current: Option<Preset>,
     pub current_slot: i32,
     pub dirty: bool,
+    pub usb_gain: Option<f32>,
+    pub line_out_gain: Option<f32>,
+    pub dsp_load: VecDeque<f32>,
 }
+
+const DSP_HISTORY: usize = 120;
+const DSP_POLL: Duration = Duration::from_millis(500);
 
 pub enum UiCmd {
     Connect,
@@ -44,16 +53,35 @@ pub enum UiCmd {
         value: Value,
     },
     Save,
+    ReplaceNode { node: String, model: String },
+    SaveAs { name: String, slot: i32 },
+    SetUsbGain(f32),
+    SetLineOutGain(f32),
+    Import { data: String, slot: i32 },
 }
 
 pub struct FenderAmp {
     client: FenderClient,
     events: Receiver<FenderMessageLt>,
     state: Arc<Mutex<AmpState>>,
+    _lock: File,
+}
+
+fn single_instance_lock(dir: &Path) -> Result<File, DynamicError> {
+    let file = File::create(dir.join("guit2.lock"))?;
+    match file.try_lock() {
+        Ok(()) => Ok(file),
+        Err(TryLockError::WouldBlock) => {
+            Err("guit2 is already running in another window. close it, then press Connect".into())
+        }
+        Err(TryLockError::Error(e)) => Err(e.into()),
+    }
 }
 
 impl FenderAmp {
     pub fn connect(state: Arc<Mutex<AmpState>>) -> Result<Self, DynamicError> {
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+        let lock = single_instance_lock(&runtime)?;
         let device = FenderDevice::open(&device::new_api_instance()?).map_err(|e| {
             format!("{e} (plugged in? without root you need the udev rule from the readme)")
         })?;
@@ -64,6 +92,7 @@ impl FenderAmp {
             client,
             events,
             state,
+            _lock: lock,
         };
 
         {
@@ -75,6 +104,15 @@ impl FenderAmp {
         }
 
         amp.refresh_current()?;
+
+        {
+            let usb = amp.client.get_usb_gain().ok();
+            let line_out = amp.client.get_line_out_gain().ok();
+            let mut s = amp.state();
+            s.usb_gain = usb;
+            s.line_out_gain = line_out;
+            s.dsp_load.clear();
+        }
 
         Ok(amp)
     }
@@ -120,6 +158,37 @@ impl FenderAmp {
                 Ok(())
             }
 
+            UiCmd::ReplaceNode { node, model } => {
+                self.client.replace_node(&node, &model)?;
+                self.refresh_current()
+            }
+
+            UiCmd::SaveAs { name, slot } => {
+                self.client.save_current_preset_to(&name, slot)?;
+                self.refresh_slot(slot)?;
+                self.refresh_current()
+            }
+
+            UiCmd::SetUsbGain(db) => {
+                self.client.set_usb_gain(db)?;
+                let v = self.client.get_usb_gain()?;
+                self.state().usb_gain = Some(v);
+                Ok(())
+            }
+
+            UiCmd::SetLineOutGain(db) => {
+                self.client.set_line_out_gain(db)?;
+                let v = self.client.get_line_out_gain()?;
+                self.state().line_out_gain = Some(v);
+                Ok(())
+            }
+
+            UiCmd::Import { data, slot } => {
+                self.client.save_preset_as(&data, slot)?;
+                self.refresh_slot(slot)?;
+                self.refresh_current()
+            }
+
             UiCmd::Save => {
                 let slot = self.state().current_slot;
                 self.client.save_current_preset()?;
@@ -158,6 +227,8 @@ impl FenderAmp {
 
             Some(fmltType::PresetSavedStatus(p)) => self.refresh_slot(p.slot),
 
+            Some(fmltType::ReplaceNodeStatus(_)) => self.refresh_current(),
+
             _ => Ok(()),
         }
     }
@@ -167,6 +238,8 @@ impl FenderAmp {
 pub fn run(state: Arc<Mutex<AmpState>>, cmds: Receiver<UiCmd>, repaint: impl Fn()) {
     let mut amp: Option<FenderAmp> = None;
     let mut want_connect = true;
+    let mut last_poll = Instant::now();
+    let mut poll_dsp = true;
 
     let set_status = |status: String| state.lock().unwrap().status = status;
 
@@ -177,7 +250,10 @@ pub fn run(state: Arc<Mutex<AmpState>>, cmds: Receiver<UiCmd>, repaint: impl Fn(
             repaint();
 
             match FenderAmp::connect(state.clone()) {
-                Ok(a) => amp = Some(a),
+                Ok(a) => {
+                    amp = Some(a);
+                    poll_dsp = true;
+                }
                 Err(e) => set_status(format!("connect failed: {e}")),
             }
             repaint();
@@ -224,6 +300,21 @@ pub fn run(state: Arc<Mutex<AmpState>>, cmds: Receiver<UiCmd>, repaint: impl Fn(
             }
         }
 
+        if let Some(a) = amp.as_ref().filter(|_| poll_dsp && last_poll.elapsed() >= DSP_POLL) {
+            last_poll = Instant::now();
+            match a.client.get_processor_utilization() {
+                Ok(p) => {
+                    let mut s = state.lock().unwrap();
+                    s.dsp_load.push_back(p.percent);
+                    if s.dsp_load.len() > DSP_HISTORY {
+                        s.dsp_load.pop_front();
+                    }
+                    changed = true;
+                }
+                Err(_) => poll_dsp = false,
+            }
+        }
+
         if lost {
             amp = None;
             let mut s = state.lock().unwrap();
@@ -235,5 +326,21 @@ pub fn run(state: Arc<Mutex<AmpState>>, cmds: Receiver<UiCmd>, repaint: impl Fn(
         if changed {
             repaint();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn second_lock_is_refused_until_first_drops() {
+        let dir = std::env::temp_dir().join("guit2-lock-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let first = single_instance_lock(&dir).unwrap();
+        let second = single_instance_lock(&dir).unwrap_err().to_string();
+        assert!(second.contains("already running"), "{second}");
+        drop(first);
+        assert!(single_instance_lock(&dir).is_ok());
     }
 }

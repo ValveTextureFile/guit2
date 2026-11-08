@@ -26,6 +26,18 @@ and keeps the window in sync with the amp's physical knobs + preset encoder.
 - click a preset on the left to load it (asks first if you have unsaved edits)
 - edit dsp parameters in the middle, they're sent to the amp live
 - "Save to slot" writes the edited preset back to its slot
+- the dropdown next to each block (stomp/mod/amp/delay/reverb) swaps its model, ON/BYPASSED toggles it
+- knobs: drag up/down (shift = fine, double-click = center), or type into the box under them
+- "Save as / rename…" saves under a new name and/or into another slot
+- "Export JSON…" writes the current preset (with unsaved edits) to the preset folder (~/guit2-presets by default)
+- "Import JSON…" lists .json files in the preset folder and writes the chosen one into a slot (overwrites it)
+- signal flow strip under the preset name: IN → blocks → OUT, click a block to bypass it
+- under the blocks: TAP tempo for the delay, USB gain (+ line out if the amp has one), live DSP load graph
+- Preferences tab: theme, accent color, UI scale, startup animation, preset folder (saved between runs); about + disclaimer
 
 to run without sudo install the udev rule, then replug the amp:
     sudo cp 99-guit2.rules /etc/udev/rules.d/ && sudo udevadm control --reload
+
+only one guit2 can be connected at a time (the amp sends its replies to every program that has it open).
+a second copy shows "already running"; close the first, then press Connect. the lock is
+$XDG_RUNTIME_DIR/guit2.lock and is released automatically when guit2 exits or crashes.

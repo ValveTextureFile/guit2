@@ -1,12 +1,12 @@
 [package]
 name = "guit2"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 license = "GPL-3.0-only"
 
 [dependencies]
 colored = "3.1.1"
-eframe = "0.37"
+eframe = { version = "0.37", features = ["persistence"] }
 hex = "0.4.3"
 hidapi = "2.6.7"
 prost = "0.14.4"

@@ -100,7 +100,8 @@ pub struct DspNode {
     pub node_type: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct PresetInfo {
     pub author: String,
     pub bpm: u32,

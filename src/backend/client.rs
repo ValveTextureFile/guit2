@@ -12,7 +12,10 @@ use crate::{
         device::{self, FenderDevice},
         fenderprotos::{
             CurrentPresetRequest, CurrentPresetStatus, FenderMessageLt, FirmwareVersionRequest,
-            LoadPreset, ModalContext, ModalState, ResponseType, RetrievePreset, SaveCurrentPreset,
+            LineOutGainRequest, LineOutGainSet, ProcessorUtilization, ProcessorUtilizationRequest,
+            UsbGainRequest, UsbGainSet,
+            LoadPreset, ModalContext, ModalState, ReplaceNode, ResponseType, RetrievePreset, SaveCurrentPreset,
+            SaveCurrentPresetTo, SavePresetAs,
             SetDspUnitParameter, dsp_unit_parameter_status, set_dsp_unit_parameter,
             fender_message_lt::Type as fmltType,
         },
@@ -338,6 +341,74 @@ impl FenderClient {
             node_id: node_id.into(),
             parameter_id: parameter_id.into(),
             r#type: Some(param_to_proto(value)?),
+        }))?;
+
+        Ok(())
+    }
+
+    pub fn replace_node(&self, node_id: &str, fender_id: &str) -> Result<(), DynamicError> {
+        self.transact(LTMessage::replace_node(ReplaceNode {
+            node_id_to_replace: node_id.into(),
+            fender_id_to_replace_with: fender_id.into(),
+        }))?;
+
+        Ok(())
+    }
+
+    pub fn get_usb_gain(&self) -> Result<f32, DynamicError> {
+        match self.transact(LTMessage::usb_gain_request(UsbGainRequest { request: true }))?.r#type {
+            Some(fmltType::UsbGainStatus(s)) => Ok(s.value_db),
+            other => Err(format!("unexpected response to UsbGainRequest: {other:?}").into()),
+        }
+    }
+
+    pub fn set_usb_gain(&self, value_db: f32) -> Result<(), DynamicError> {
+        self.transact(LTMessage::usb_gain_set(UsbGainSet { value_db }))?;
+        Ok(())
+    }
+
+    pub fn get_line_out_gain(&self) -> Result<f32, DynamicError> {
+        match self.transact(LTMessage::line_out_gain_request(LineOutGainRequest { request: true }))?.r#type {
+            Some(fmltType::LineOutGainStatus(s)) => Ok(s.value_db),
+            other => Err(format!("unexpected response to LineOutGainRequest: {other:?}").into()),
+        }
+    }
+
+    pub fn set_line_out_gain(&self, value_db: f32) -> Result<(), DynamicError> {
+        self.transact(LTMessage::line_out_gain_set(LineOutGainSet { value_db }))?;
+        Ok(())
+    }
+
+    pub fn get_processor_utilization(&self) -> Result<ProcessorUtilization, DynamicError> {
+        let msg = LTMessage::processor_utilization_request(ProcessorUtilizationRequest { request: true });
+        match self.transact(msg)?.r#type {
+            Some(fmltType::ProcessorUtilization(p)) => Ok(p),
+            other => Err(format!("unexpected response to ProcessorUtilizationRequest: {other:?}").into()),
+        }
+    }
+
+    pub fn save_preset_as(&self, data: &str, slot: i32) -> Result<(), DynamicError> {
+        if !(1..=60).contains(&slot) {
+            return Err("slot must be between 1 and 60".into());
+        }
+
+        self.transact(LTMessage::save_preset_as(SavePresetAs {
+            preset_data: data.into(),
+            is_load_preset: true,
+            preset_slot: slot,
+        }))?;
+
+        Ok(())
+    }
+
+    pub fn save_current_preset_to(&self, name: &str, slot: i32) -> Result<(), DynamicError> {
+        if !(1..=60).contains(&slot) {
+            return Err("slot must be between 1 and 60".into());
+        }
+
+        self.transact(LTMessage::save_current_preset_to(SaveCurrentPresetTo {
+            preset_name: name.into(),
+            preset_slot: slot,
         }))?;
 
         Ok(())

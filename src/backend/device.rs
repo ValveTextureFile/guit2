@@ -105,12 +105,12 @@ impl FenderDevice {
         Ok(_result?)
     }
 
-    /// returns data and bytes read | lower function, not recommended to use
-    pub fn receive(&self) -> Result<(FenderData, usize), DynamicError> {
+    /// returns data and bytes read, or None if nothing arrived within `timeout_ms` | lower function, not recommended to use
+    pub fn receive(&self, timeout_ms: i32) -> Result<Option<(FenderData, usize)>, DynamicError> {
         let mut recieved: FenderData = [0u8; 64];
-        let recieved_bytes = self.device.read(&mut recieved)?;
+        let recieved_bytes = self.device.read_timeout(&mut recieved, timeout_ms)?;
 
-        Ok((recieved.to_owned(), recieved_bytes))
+        Ok((recieved_bytes > 0).then_some((recieved, recieved_bytes)))
     }
 
     /// takes more higher level FenderReport. (reduce boilerplate)
@@ -122,16 +122,11 @@ impl FenderDevice {
         self.send(&payload, typ)
     }
 
-    /// returns more higher Fender Report.
-    pub fn higher_receive(&self) -> Result<FenderReport, DynamicError> {
-        let data = match self.receive() {
-            Ok((fdata, _bytes)) => fdata,
-
-            Err(e) => {
-                return Err(e);
-            }
-        };
-
-        FenderReport::from_data(data)
+    /// returns more higher Fender Report, or None on timeout.
+    pub fn higher_receive(&self, timeout_ms: i32) -> Result<Option<FenderReport>, DynamicError> {
+        match self.receive(timeout_ms)? {
+            Some((fdata, _bytes)) => Ok(Some(FenderReport::from_data(fdata)?)),
+            None => Ok(None),
+        }
     }
 }

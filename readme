@@ -17,3 +17,15 @@ https://cdn.kernel.org/doc/html/latest/hid/hidintro.html - Linux Kernel Docs | I
 ltamp-docs contain docs written by Brent Maxwell (https://github.com/brentmaxwell/LtAmp/tree/main/Docs)
 
 
+
+running
+-------
+guit2 is a gui app (egui). `cargo run` opens it, it connects to the amp, pulls all 60 presets
+and keeps the window in sync with the amp's physical knobs + preset encoder.
+
+- click a preset on the left to load it (asks first if you have unsaved edits)
+- edit dsp parameters in the middle, they're sent to the amp live
+- "Save to slot" writes the edited preset back to its slot
+
+to run without sudo install the udev rule, then replug the amp:
+    sudo cp 99-guit2.rules /etc/udev/rules.d/ && sudo udevadm control --reload

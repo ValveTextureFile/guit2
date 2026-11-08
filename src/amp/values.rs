@@ -1,10 +1,10 @@
-use std::{collections::HashMap, fmt::{Display, Write}};
+use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::DynamicError;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Preset {
     #[serde(rename = "audioGraph")]
     pub audio_graph: AudioGraph,
@@ -65,19 +65,19 @@ impl Preset {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct AudioGraph {
     pub connections: Vec<Connection>,
     pub nodes: Vec<DspNode>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Connection {
     pub input: ConnectionPoint,
     pub output: ConnectionPoint,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConnectionPoint {
     pub index: u32,
 
@@ -85,7 +85,7 @@ pub struct ConnectionPoint {
     pub node_id: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DspNode {
     #[serde(rename = "FenderId")]
     pub fender_id: String,
@@ -100,7 +100,7 @@ pub struct DspNode {
     pub node_type: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct PresetInfo {
     pub author: String,
     pub bpm: u32,

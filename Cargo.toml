@@ -6,6 +6,7 @@ license = "GPL-3.0-only"
 
 [dependencies]
 colored = "3.1.1"
+eframe = "0.37"
 hex = "0.4.3"
 hidapi = "2.6.7"
 prost = "0.14.4"

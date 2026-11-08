@@ -1,0 +1,2 @@
+# lets the logged-in user talk to the Mustang LT25 over hidraw without root
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1ed8", ATTRS{idProduct}=="0037", MODE="0660", TAG+="uaccess"
